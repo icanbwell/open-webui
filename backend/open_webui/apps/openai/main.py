@@ -43,6 +43,8 @@ from open_webui.utils.payload import (
 from open_webui.utils.utils import get_admin_user, get_verified_user
 from open_webui.utils.access_control import has_access
 
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from open_webui.utils.utils import bearer_security
 
 log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["OPENAI"])
@@ -487,6 +489,7 @@ async def verify_connection(
 async def generate_chat_completion(
     form_data: dict,
     user=Depends(get_verified_user),
+    auth_token: HTTPAuthorizationCredentials = Depends(bearer_security),
     bypass_filter: Optional[bool] = False,
 ):
     idx = 0
@@ -587,7 +590,10 @@ async def generate_chat_completion(
     payload = json.dumps(payload)
 
     headers = {}
-    headers["Authorization"] = f"Bearer {key}"
+    if auth_token:
+        headers["Authorization"] = f"Bearer {auth_token.credentials}"
+    else:
+        headers["Authorization"] = f"Bearer {key}"
     headers["Content-Type"] = "application/json"
     if "openrouter.ai" in app.state.config.OPENAI_API_BASE_URLS[idx]:
         headers["HTTP-Referer"] = "https://openwebui.com/"

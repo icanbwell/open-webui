@@ -887,6 +887,10 @@ class PipelineMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         log.debug(f"request.url.path: {request.url.path}")
+        log.info(f"request.url.path: {request.url.path}")
+        log.info(f"request: {request}")
+        log.info(f"request vars: {vars(request)}")
+        log.info(f"request dict: {request.__dict__}")
 
         # Read the original request body
         body = await request.body()
@@ -896,10 +900,13 @@ class PipelineMiddleware(BaseHTTPMiddleware):
         data = json.loads(body_str) if body_str else {}
 
         try:
+            authorization_header = request.headers["Authorization"]
+            log.info(f"{authorization_header=}")
             user = get_current_user(
                 request,
-                get_http_authorization_cred(request.headers["Authorization"]),
+                get_http_authorization_cred(authorization_header),
             )
+            log.info(f"{user=}")
         except KeyError as e:
             if len(e.args) > 1:
                 return JSONResponse(
@@ -907,6 +914,7 @@ class PipelineMiddleware(BaseHTTPMiddleware):
                     content={"detail": e.args[1]},
                 )
             else:
+                log.info(f"401 Error: {e}")
                 return JSONResponse(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     content={"detail": "Not authenticated"},
@@ -1024,6 +1032,8 @@ async def inspect_websocket(request: Request, call_next):
     ):
         upgrade = (request.headers.get("Upgrade") or "").lower()
         connection = (request.headers.get("Connection") or "").lower().split(",")
+
+        log.info(f"inspect_websocket: {upgrade=}, {connection=}")
         # Check that there's the correct headers for an upgrade, else reject the connection
         # This is to work around this upstream issue: https://github.com/miguelgrinberg/python-engineio/issues/367
         if upgrade != "websocket" or "upgrade" not in connection:
@@ -2720,6 +2730,7 @@ if len(OAUTH_PROVIDERS) > 0:
 
 @app.get("/oauth/{provider}/login")
 async def oauth_login(provider: str, request: Request):
+    log.info(f"OAuth login request for provider: {provider}")
     return await oauth_manager.handle_login(provider, request)
 
 
@@ -2731,6 +2742,7 @@ async def oauth_login(provider: str, request: Request):
 #    - Email addresses are considered unique, so we fail registration if the email address is already taken
 @app.get("/oauth/{provider}/callback")
 async def oauth_callback(provider: str, request: Request, response: Response):
+    log.info(f"OAuth callback request for provider: {provider}")
     return await oauth_manager.handle_callback(provider, request, response)
 
 

@@ -122,6 +122,7 @@ async def usage(sid, data):
 
 @sio.event
 async def connect(sid, environ, auth):
+    log.info(f"connect {sid} auth: {auth} environ: {environ}")
     user = None
     if auth and "token" in auth:
         data = decode_token(auth["token"])
@@ -139,11 +140,14 @@ async def connect(sid, environ, auth):
             # print(f"user {user.name}({user.id}) connected with session ID {sid}")
             await sio.emit("user-count", {"count": len(USER_POOL.items())})
             await sio.emit("usage", {"models": get_models_in_use()})
+    else:
+        log.info(f"Unknown session ID {sid} connected with auth {auth}")
+        raise ConnectionRefusedError(f"Authentication required.  Auth token not provided or invalid: {auth}")
 
 
 @sio.on("user-join")
 async def user_join(sid, data):
-    # print("user-join", sid, data)
+    log.info("user-join", sid, data)
 
     auth = data["auth"] if "auth" in data else None
     if not auth or "token" not in auth:
@@ -163,7 +167,7 @@ async def user_join(sid, data):
     else:
         USER_POOL[user.id] = [sid]
 
-    # print(f"user {user.name}({user.id}) connected with session ID {sid}")
+    log.info(f"user {user.name}({user.id}) connected with session ID {sid}")
 
     await sio.emit("user-count", {"count": len(USER_POOL.items())})
 
@@ -186,8 +190,8 @@ async def disconnect(sid):
 
         await sio.emit("user-count", {"count": len(USER_POOL)})
     else:
+        log.info(f"Unknown session ID {sid} disconnected")
         pass
-        # print(f"Unknown session ID {sid} disconnected")
 
 
 def get_event_emitter(request_info):

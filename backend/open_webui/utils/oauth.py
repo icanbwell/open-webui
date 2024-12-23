@@ -2,6 +2,7 @@ import base64
 import logging
 import mimetypes
 import uuid
+from typing import Dict, Any
 
 import aiohttp
 from authlib.integrations.starlette_client import OAuth
@@ -118,15 +119,19 @@ class OAuthManager:
         return role
 
     async def handle_login(self, provider, request):
+        log.info(f"Handling OAuth login for provider '{provider}'")
         if provider not in OAUTH_PROVIDERS:
+            log.error(f"OAuth provider '{provider}' not found")
             raise HTTPException(404)
         # If the provider has a custom redirect URL, use that, otherwise automatically generate one
         redirect_uri = OAUTH_PROVIDERS[provider].get("redirect_uri") or request.url_for(
             "oauth_callback", provider=provider
         )
+        log.info(f"Redirecting to OAuth provider '{provider}' with redirect URI '{redirect_uri}'")
         client = self.get_client(provider)
         if client is None:
             raise HTTPException(404)
+
         return await client.authorize_redirect(request, redirect_uri)
 
     async def handle_callback(self, provider, request, response):
@@ -134,7 +139,7 @@ class OAuthManager:
             raise HTTPException(404)
         client = self.get_client(provider)
         try:
-            token = await client.authorize_access_token(request)
+            token: Dict[str, Any()] = await client.authorize_access_token(request)
         except Exception as e:
             log.warning(f"OAuth callback error: {e}")
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
@@ -253,7 +258,17 @@ class OAuthManager:
             secure=WEBUI_SESSION_COOKIE_SECURE,
         )
 
+        # Also set the original token in the cookie
+        response.set_cookie(
+            key="sso_token",
+            value=jwt_token,
+            httponly=True,  # Ensures the cookie is not accessible via JavaScript
+            samesite=WEBUI_SESSION_COOKIE_SAME_SITE,
+            secure=WEBUI_SESSION_COOKIE_SECURE,
+        )
+
         # Redirect back to the frontend with the JWT token
+        log.info(f"Redirecting for token '{jwt_token}'")
         redirect_url = f"{request.base_url}auth#token={jwt_token}"
         return RedirectResponse(url=redirect_url)
 
