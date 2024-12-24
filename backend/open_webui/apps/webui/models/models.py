@@ -146,6 +146,7 @@ class ModelsTable:
     def insert_new_model(
         self, form_data: ModelForm, user_id: str
     ) -> Optional[ModelModel]:
+        log.info(f"Inserting new model: {form_data}")
         model = ModelModel(
             **{
                 **form_data.model_dump(),

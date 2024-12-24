@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from open_webui.apps.webui.models.models import (
@@ -14,7 +15,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from open_webui.utils.utils import get_admin_user, get_verified_user
 from open_webui.utils.access_control import has_access, has_permission
 
+from open_webui.env import SRC_LOG_LEVELS
 
+log = logging.getLogger(__name__)
+log.setLevel(SRC_LOG_LEVELS["MODELS"])
 router = APIRouter()
 
 
@@ -25,6 +29,7 @@ router = APIRouter()
 
 @router.get("/", response_model=list[ModelUserResponse])
 async def get_models(id: Optional[str] = None, user=Depends(get_verified_user)):
+    log.info(f"Getting models for user: {user}")
     if user.role == "admin":
         return Models.get_models()
     else:
@@ -38,6 +43,7 @@ async def get_models(id: Optional[str] = None, user=Depends(get_verified_user)):
 
 @router.get("/base", response_model=list[ModelResponse])
 async def get_base_models(user=Depends(get_admin_user)):
+    log.info(f"Getting base models")
     return Models.get_base_models()
 
 
@@ -52,9 +58,11 @@ async def create_new_model(
     form_data: ModelForm,
     user=Depends(get_verified_user),
 ):
+    log.info(f"Creating new model: {form_data}")
     if user.role != "admin" and not has_permission(
         user.id, "workspace.models", request.app.state.config.USER_PERMISSIONS
     ):
+        log.info(f"User does not have permission to create model")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=ERROR_MESSAGES.UNAUTHORIZED,
@@ -62,6 +70,7 @@ async def create_new_model(
 
     model = Models.get_model_by_id(form_data.id)
     if model:
+        log.info(f"Model id already taken: {form_data.id}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=ERROR_MESSAGES.MODEL_ID_TAKEN,
@@ -70,8 +79,10 @@ async def create_new_model(
     else:
         model = Models.insert_new_model(form_data, user.id)
         if model:
+            log.info(f"Model created: {model}")
             return model
         else:
+            log.info(f"Error creating model because user is not authorized")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=ERROR_MESSAGES.DEFAULT(),
@@ -86,6 +97,7 @@ async def create_new_model(
 # Note: We're not using the typical url path param here, but instead using a query parameter to allow '/' in the id
 @router.get("/model", response_model=Optional[ModelResponse])
 async def get_model_by_id(id: str, user=Depends(get_verified_user)):
+    log.info(f"Getting model by id: {id}")
     model = Models.get_model_by_id(id)
     if model:
         if (
@@ -108,6 +120,7 @@ async def get_model_by_id(id: str, user=Depends(get_verified_user)):
 
 @router.post("/model/toggle", response_model=Optional[ModelResponse])
 async def toggle_model_by_id(id: str, user=Depends(get_verified_user)):
+    log.info(f"Toggling model: {id}")
     model = Models.get_model_by_id(id)
     if model:
         if (
@@ -147,6 +160,7 @@ async def update_model_by_id(
     form_data: ModelForm,
     user=Depends(get_verified_user),
 ):
+    log.info(f"Updating model: {form_data}")
     model = Models.get_model_by_id(id)
 
     if not model:

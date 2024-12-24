@@ -888,7 +888,6 @@ class PipelineMiddleware(BaseHTTPMiddleware):
 
         log.debug(f"request.url.path: {request.url.path}")
         log.info(f"PipelineMiddleware.dispatch request.url.path: {request.url.path}")
-        log.info(f"PipelineMiddleware.dispatch request: {request}")
         log.info(f"PipelineMiddleware.dispatch request vars: {vars(request)}")
         log.info(f"PipelineMiddleware.dispatch request dict: {request.__dict__}")
 
@@ -898,6 +897,8 @@ class PipelineMiddleware(BaseHTTPMiddleware):
         body_str = body.decode("utf-8")
         # Parse string to JSON
         data = json.loads(body_str) if body_str else {}
+
+        log.info(f"PipelineMiddleware.dispatch request body: {data}")
 
         try:
             authorization_header = request.headers["Authorization"]
@@ -931,6 +932,7 @@ class PipelineMiddleware(BaseHTTPMiddleware):
         try:
             data = filter_pipeline(data, user, models)
         except Exception as e:
+            log.error(f"PipelineMiddleware.dispatch Filter Pipeline Error: {e}")
             if len(e.args) > 1:
                 return JSONResponse(
                     status_code=e.args[0],
@@ -951,7 +953,9 @@ class PipelineMiddleware(BaseHTTPMiddleware):
             *[(k, v) for k, v in request.headers.raw if k.lower() != b"content-length"],
         ]
 
+        log.info(f"PipelineMiddleware.dispatch request._body: {request._body}")
         response = await call_next(request)
+        log.info(f"PipelineMiddleware.dispatch response: {response}")
         return response
 
     async def _receive(self, body: bytes):
@@ -1277,17 +1281,20 @@ async def get_base_models(user=Depends(get_admin_user)):
 async def generate_chat_completions(
     form_data: dict, user=Depends(get_verified_user), bypass_filter: bool = False
 ):
+    log.info(f"OpenWebUI:main generate_chat_completions: {form_data=}, {user=}, {bypass_filter=}")
     model_list = await get_all_models()
     models = {model["id"]: model for model in model_list}
 
     model_id = form_data["model"]
     if model_id not in models:
+        log.error(f"Model not found: {model_id} in {models=}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Model not found",
         )
 
     model = models[model_id]
+    log.info(f"OpenWebUI:main generate_chat_completions: {model=}")
 
     # Check if user has access to the model
     if not bypass_filter and user.role == "user":
@@ -1305,6 +1312,7 @@ async def generate_chat_completions(
                 )
         else:
             model_info = Models.get_model_by_id(model_id)
+            log.info(f"OpenWebUI:main generate_chat_completions: {model_info=}")
             if not model_info:
                 raise HTTPException(
                     status_code=404,
