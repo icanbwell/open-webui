@@ -142,7 +142,7 @@ async def connect(sid, environ, auth):
             await sio.emit("usage", {"models": get_models_in_use()})
     else:
         log.info(f"Unknown session ID {sid} connected with auth {auth}")
-        raise ConnectionRefusedError(f"Authentication required.  Auth token not provided or invalid: {auth}")
+        # raise ConnectionRefusedError(f"Authentication required.  Auth token not provided or invalid: {auth}")
 
 
 @sio.on("user-join")

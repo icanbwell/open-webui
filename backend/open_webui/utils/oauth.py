@@ -70,9 +70,11 @@ class OAuthManager:
             )
 
     def get_client(self, provider_name):
+        log.info(f"Getting OAuth client for provider '{provider_name}'")
         return self.oauth.create_client(provider_name)
 
     def get_user_role(self, user, user_data):
+        log.info(f"Getting user role for user '{user}' and user data '{user_data}'")
         if user and Users.get_num_users() == 1:
             # If the user is the only user, assign the role "admin" - actually repairs role for single user on login
             return "admin"
@@ -135,6 +137,7 @@ class OAuthManager:
         return await client.authorize_redirect(request, redirect_uri)
 
     async def handle_callback(self, provider, request, response):
+        log.info(f"Handling OAuth callback for provider '{provider}'")
         if provider not in OAUTH_PROVIDERS:
             raise HTTPException(404)
         client = self.get_client(provider)
