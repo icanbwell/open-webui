@@ -502,6 +502,7 @@ async def signup(request: Request, response: Response, form_data: SignupForm):
 
 @router.get("/signout")
 async def signout(response: Response):
+    log.info("User is trying to sign out")
     response.delete_cookie("token")
     return {"status": True}
 
