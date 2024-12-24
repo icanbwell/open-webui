@@ -492,6 +492,7 @@ async def generate_chat_completion(
     auth_token: HTTPAuthorizationCredentials = Depends(bearer_security),
     bypass_filter: Optional[bool] = False,
 ):
+    log.info(f"generate_chat_completion: {form_data}")
     idx = 0
     payload = {**form_data}
 
@@ -613,6 +614,7 @@ async def generate_chat_completion(
         session = aiohttp.ClientSession(
             trust_env=True, timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
         )
+        log.info(f"generate_chat_completion: {url=} {payload=} {headers=}")
         r = await session.request(
             method="POST",
             url=f"{url}/chat/completions",

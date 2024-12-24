@@ -122,7 +122,7 @@ async def usage(sid, data):
 
 @sio.event
 async def connect(sid, environ, auth):
-    log.info(f"connect {sid} auth: {auth} environ: {environ}")
+    log.info(f"socket connect {sid} auth: {auth} environ: {environ}")
     user = None
     if auth and "token" in auth:
         data = decode_token(auth["token"])
@@ -141,19 +141,20 @@ async def connect(sid, environ, auth):
             await sio.emit("user-count", {"count": len(USER_POOL.items())})
             await sio.emit("usage", {"models": get_models_in_use()})
     else:
-        log.info(f"Unknown session ID {sid} connected with auth {auth}")
+        log.info(f"socket session ID {sid} connected with auth {auth}")
         # raise ConnectionRefusedError(f"Authentication required.  Auth token not provided or invalid: {auth}")
 
 
 @sio.on("user-join")
 async def user_join(sid, data):
-    log.info("user-join", sid, data)
+    log.info(f"socket user-join {sid=} {data=}")
 
     auth = data["auth"] if "auth" in data else None
     if not auth or "token" not in auth:
         return
 
     data = decode_token(auth["token"])
+    log.info(f"socket user-join decoded token: {data}")
     if data is None or "id" not in data:
         return
 
@@ -167,7 +168,7 @@ async def user_join(sid, data):
     else:
         USER_POOL[user.id] = [sid]
 
-    log.info(f"user {user.name}({user.id}) connected with session ID {sid}")
+    log.info(f"socket user-join {user.name}({user.id}) connected with session ID {sid}")
 
     await sio.emit("user-count", {"count": len(USER_POOL.items())})
 
@@ -180,6 +181,7 @@ async def user_count(sid):
 @sio.event
 async def disconnect(sid):
     if sid in SESSION_POOL:
+        log.info(f"socket session ID {sid} disconnected from SESSION_POOL")
         user_id = SESSION_POOL[sid]
         del SESSION_POOL[sid]
 
@@ -190,7 +192,7 @@ async def disconnect(sid):
 
         await sio.emit("user-count", {"count": len(USER_POOL)})
     else:
-        log.info(f"Unknown session ID {sid} disconnected")
+        log.info(f"socket session ID {sid} disconnected")
         pass
 
 

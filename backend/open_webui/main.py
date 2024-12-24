@@ -887,10 +887,10 @@ class PipelineMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         log.debug(f"request.url.path: {request.url.path}")
-        log.info(f"request.url.path: {request.url.path}")
-        log.info(f"request: {request}")
-        log.info(f"request vars: {vars(request)}")
-        log.info(f"request dict: {request.__dict__}")
+        log.info(f"PipelineMiddleware.dispatch request.url.path: {request.url.path}")
+        log.info(f"PipelineMiddleware.dispatch request: {request}")
+        log.info(f"PipelineMiddleware.dispatch request vars: {vars(request)}")
+        log.info(f"PipelineMiddleware.dispatch request dict: {request.__dict__}")
 
         # Read the original request body
         body = await request.body()
@@ -901,12 +901,12 @@ class PipelineMiddleware(BaseHTTPMiddleware):
 
         try:
             authorization_header = request.headers["Authorization"]
-            log.info(f"{authorization_header=}")
+            log.info(f"PipelineMiddleware.dispatch {authorization_header=}")
             user = get_current_user(
                 request,
                 get_http_authorization_cred(authorization_header),
             )
-            log.info(f"{user=}")
+            log.info(f"PipelineMiddleware.dispatch {user=}")
         except KeyError as e:
             if len(e.args) > 1:
                 return JSONResponse(
