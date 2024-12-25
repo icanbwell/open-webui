@@ -1398,7 +1398,7 @@ async def generate_chat_completions(
                     yield chunk
 
             response = await generate_chat_completions(
-                form_data, user, bypass_filter=True
+                form_data, user, bypass_filter=True, auth_token=auth_token
             )
             return StreamingResponse(
                 stream_wrapper(response.body_iterator), media_type="text/event-stream"
@@ -1406,7 +1406,7 @@ async def generate_chat_completions(
         else:
             return {
                 **(
-                    await generate_chat_completions(form_data, user, bypass_filter=True)
+                    await generate_chat_completions(form_data, user, bypass_filter=True, auth_token=auth_token)
                 ),
                 "selected_model_id": selected_model_id,
             }
@@ -1810,7 +1810,7 @@ async def update_task_config(form_data: TaskConfigForm, user=Depends(get_admin_u
 
 
 @app.post("/api/task/title/completions")
-async def generate_title(form_data: dict, user=Depends(get_verified_user)):
+async def generate_title(form_data: dict, user=Depends(get_verified_user), auth_token=Depends(get_auth_token)):
 
     model_list = await get_all_models()
     models = {model["id"]: model for model in model_list}
@@ -1896,11 +1896,11 @@ Artificial Intelligence in Healthcare
     if "chat_id" in payload:
         del payload["chat_id"]
 
-    return await generate_chat_completions(form_data=payload, user=user)
+    return await generate_chat_completions(form_data=payload, user=user, auth_token=auth_token)
 
 
 @app.post("/api/task/tags/completions")
-async def generate_chat_tags(form_data: dict, user=Depends(get_verified_user)):
+async def generate_chat_tags(form_data: dict, user=Depends(get_verified_user), auth_token=Depends(get_auth_token)):
 
     if not app.state.config.ENABLE_TAGS_GENERATION:
         return JSONResponse(
@@ -1984,11 +1984,11 @@ JSON format: { "tags": ["tag1", "tag2", "tag3"] }
     if "chat_id" in payload:
         del payload["chat_id"]
 
-    return await generate_chat_completions(form_data=payload, user=user)
+    return await generate_chat_completions(form_data=payload, user=user, auth_token=auth_token)
 
 
 @app.post("/api/task/queries/completions")
-async def generate_queries(form_data: dict, user=Depends(get_verified_user)):
+async def generate_queries(form_data: dict, user=Depends(get_verified_user), auth_token=Depends(get_auth_token)):
 
     type = form_data.get("type")
     if type == "web_search":
@@ -2064,11 +2064,11 @@ async def generate_queries(form_data: dict, user=Depends(get_verified_user)):
     if "chat_id" in payload:
         del payload["chat_id"]
 
-    return await generate_chat_completions(form_data=payload, user=user)
+    return await generate_chat_completions(form_data=payload, user=user, auth_token=auth_token)
 
 
 @app.post("/api/task/auto/completions")
-async def generate_autocompletion(form_data: dict, user=Depends(get_verified_user)):
+async def generate_autocompletion(form_data: dict, user=Depends(get_verified_user), auth_token=Depends(get_auth_token)):
     if not app.state.config.ENABLE_AUTOCOMPLETE_GENERATION:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -2148,11 +2148,11 @@ async def generate_autocompletion(form_data: dict, user=Depends(get_verified_use
     if "chat_id" in payload:
         del payload["chat_id"]
 
-    return await generate_chat_completions(form_data=payload, user=user)
+    return await generate_chat_completions(form_data=payload, user=user, auth_token=auth_token)
 
 
 @app.post("/api/task/emoji/completions")
-async def generate_emoji(form_data: dict, user=Depends(get_verified_user)):
+async def generate_emoji(form_data: dict, user=Depends(get_verified_user), auth_token=Depends(get_auth_token)):
 
     model_list = await get_all_models()
     models = {model["id"]: model for model in model_list}
@@ -2221,11 +2221,11 @@ Message: """{{prompt}}"""
     if "chat_id" in payload:
         del payload["chat_id"]
 
-    return await generate_chat_completions(form_data=payload, user=user)
+    return await generate_chat_completions(form_data=payload, user=user, auth_token=auth_token)
 
 
 @app.post("/api/task/moa/completions")
-async def generate_moa_response(form_data: dict, user=Depends(get_verified_user)):
+async def generate_moa_response(form_data: dict, user=Depends(get_verified_user), auth_token=Depends(get_auth_token)):
 
     model_list = await get_all_models()
     models = {model["id"]: model for model in model_list}
@@ -2287,7 +2287,7 @@ Responses from models: {{responses}}"""
     if "chat_id" in payload:
         del payload["chat_id"]
 
-    return await generate_chat_completions(form_data=payload, user=user)
+    return await generate_chat_completions(form_data=payload, user=user, auth_token=auth_token)
 
 
 ##################################
