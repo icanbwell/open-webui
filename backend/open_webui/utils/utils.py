@@ -154,7 +154,7 @@ def get_admin_user(user=Depends(get_current_user)):
         )
     return user
 
-def get_auth_token(
+def get_auth_token_with_request(
     request: Request,
     auth_token: HTTPAuthorizationCredentials = Depends(bearer_security),
 ) -> Optional[str]:
@@ -170,3 +170,8 @@ def get_auth_token(
         raise HTTPException(status_code=403, detail="Not authenticated")
 
     return token
+
+def get_auth_token(
+    auth_token: str = Depends(get_auth_token_with_request),
+) -> Optional[str]:
+    return auth_token if auth_token is not None else None

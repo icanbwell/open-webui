@@ -29,7 +29,7 @@ services:
     extra_hosts:
       - host.docker.internal:host-gateway
     volumes:
-      - ./backend:/app/backend
+      - ./backend:/app
       - data:/app/backend/data
 
 volumes:

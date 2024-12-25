@@ -147,6 +147,9 @@ from open_webui.utils.utils import (
     get_verified_user,
 )
 from open_webui.utils.access_control import has_access
+from starlette.routing import BaseRoute, Route
+
+from open_webui.utils.utils import get_auth_token
 
 if SAFE_MODE:
     print("SAFE MODE ENABLED")
@@ -195,12 +198,26 @@ def print_middleware_chain(app1: FastAPI) -> None:
     for idx, middleware in enumerate(app1.user_middleware, 1):
         log.info(f"[{idx}] Middleware: {middleware!r}")
 
+def print_routes(app1: FastAPI):
+    log.info("Routes:")
+    route: BaseRoute
+    for idx, route in enumerate(app1.routes):
+        if isinstance(route, Route):
+            route_info = {
+                "path": route.path,
+                "name": route.name,
+                "methods": route.methods,
+                "endpoint": route.endpoint.__name__
+            }
+            log.info(f"[{idx}] Route: {route_info}")
+
 @asynccontextmanager
 async def lifespan(app1: FastAPI):
     if RESET_CONFIG_ON_START:
         reset_config()
 
     print_middleware_chain(app1)
+    print_routes(app1)
     asyncio.create_task(periodic_usage_pool_cleanup())
     yield
 
@@ -1296,9 +1313,10 @@ async def get_base_models(user=Depends(get_admin_user)):
 
 @app.post("/api/chat/completions")
 async def generate_chat_completions(
-    form_data: dict, user=Depends(get_verified_user), bypass_filter: bool = False
+    form_data: dict, user=Depends(get_verified_user), auth_token=Depends(get_auth_token), bypass_filter: bool = False
 ):
-    log.info(f"OpenWebUI:main generate_chat_completions: {form_data=}, {user=}, {bypass_filter=}")
+    log.info(f"OpenWebUI:main generate_chat_completions: {form_data=}, {user=}, {auth_token=} {bypass_filter=}")
+    bypass_filter = bypass_filter or BYPASS_MODEL_ACCESS_CONTROL
     model_list = await get_all_models()
     models = {model["id"]: model for model in model_list}
     log.info(f"OpenWebUI:main generate_chat_completions: {models=}")
@@ -1415,7 +1433,7 @@ async def generate_chat_completions(
             return convert_response_ollama_to_openai(response)
     else:
         return await generate_openai_chat_completion(
-            form_data, user=user, bypass_filter=bypass_filter
+            form_data, user=user, auth_token=auth_token, bypass_filter=bypass_filter
         )
 
 
