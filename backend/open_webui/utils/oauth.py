@@ -275,20 +275,22 @@ class OAuthManager:
             secure=WEBUI_SESSION_COOKIE_SECURE,
         )
 
+
+        # Redirect back to the frontend with the JWT token
+        log.info(f"OAuthManager:handle_callback Redirecting for token '{jwt_token}' sso_token: '{token}'")
+        redirect_url = f"{request.base_url}auth#token={jwt_token}"
+        redirect_response = RedirectResponse(url=redirect_url)
         if token:
             # Also set the original token in the cookie
-            response.set_cookie(
+            redirect_response.set_cookie(
                 key="sso_token",
-                value=json.dumps(token),
+                value=token["access_token"],
                 httponly=True,  # Ensures the cookie is not accessible via JavaScript
                 samesite=WEBUI_SESSION_COOKIE_SAME_SITE,
                 secure=WEBUI_SESSION_COOKIE_SECURE,
             )
 
-        # Redirect back to the frontend with the JWT token
-        log.info(f"OAuthManager:handle_callback Redirecting for token '{jwt_token}' sso_token '{token}'")
-        redirect_url = f"{request.base_url}auth#token={jwt_token}"
-        return RedirectResponse(url=redirect_url)
+        return redirect_response
 
 
 oauth_manager = OAuthManager()
