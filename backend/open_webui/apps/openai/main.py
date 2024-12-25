@@ -43,8 +43,7 @@ from open_webui.utils.payload import (
 from open_webui.utils.utils import get_admin_user, get_verified_user
 from open_webui.utils.access_control import has_access
 
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from open_webui.utils.utils import bearer_security
+from open_webui.utils.utils import get_auth_token
 
 log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["OPENAI"])
@@ -333,7 +332,7 @@ async def get_all_models_responses() -> list:
 
 @cached(ttl=3)
 async def get_all_models() -> dict[str, list]:
-    log.info("get_all_models()")
+    log.info("OpenAI:main get_all_models()")
 
     if not app.state.config.ENABLE_OPENAI_API:
         return {"data": []}
@@ -489,10 +488,11 @@ async def verify_connection(
 async def generate_chat_completion(
     form_data: dict,
     user=Depends(get_verified_user),
-    auth_token: HTTPAuthorizationCredentials = Depends(bearer_security),
+    auth_token: Optional[str] = Depends(get_auth_token),
     bypass_filter: Optional[bool] = False,
 ):
-    log.info(f"generate_chat_completion: {form_data}")
+    log.info(f"OpenAI:main generate_chat_completion: {form_data=} {user=} {auth_token=} {bypass_filter=}")
+    bypass_filter = bypass_filter or BYPASS_MODEL_ACCESS_CONTROL
     idx = 0
     payload = {**form_data}
 
@@ -504,6 +504,7 @@ async def generate_chat_completion(
 
     # Check model info and override the payload
     if model_info:
+        log.info(f"OpenAI:main generate_chat_completion: {model_info=}")
         if model_info.base_model_id:
             payload["model"] = model_info.base_model_id
 
@@ -519,25 +520,30 @@ async def generate_chat_completion(
                     user.id, type="read", access_control=model_info.access_control
                 )
             ):
+                log.info(f"OpenAI:main generate_chat_completion: {user.id=} {model_info.user_id=}")
                 raise HTTPException(
                     status_code=403,
                     detail="Model not found",
                 )
     elif not bypass_filter:
         if user.role != "admin":
+            log.info(f"OpenAI:main generate_chat_completion: Model not found because user is not admin {user.role=}")
             raise HTTPException(
                 status_code=403,
                 detail="Model not found",
             )
 
-    # Attemp to get urlIdx from the model
+    # Attempt to get urlIdx from the model
+    log.info(f"OpenAI:main generate_chat_completion: Getting models from OpenAI API")
     models = await get_all_models()
+    log.info(f"OpenAI:main generate_chat_completion:  {models=}")
 
     # Find the model from the list
     model = next(
         (model for model in models["data"] if model["id"] == payload.get("model")),
         None,
     )
+    log.info(f"OpenAI:main generate_chat_completion: Found matching Model: {model} for id: {payload.get('model')}")
 
     if model:
         idx = model["urlIdx"]
@@ -592,7 +598,7 @@ async def generate_chat_completion(
 
     headers = {}
     if auth_token:
-        headers["Authorization"] = f"Bearer {auth_token.credentials}"
+        headers["Authorization"] = f"Bearer {auth_token}"
     else:
         headers["Authorization"] = f"Bearer {key}"
     headers["Content-Type"] = "application/json"
@@ -614,7 +620,7 @@ async def generate_chat_completion(
         session = aiohttp.ClientSession(
             trust_env=True, timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
         )
-        log.info(f"generate_chat_completion: {url=} {payload=} {headers=}")
+        log.info(f"OpenAI:main generate_chat_completion: {url=} {payload=} {headers=}")
         r = await session.request(
             method="POST",
             url=f"{url}/chat/completions",

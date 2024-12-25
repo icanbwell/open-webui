@@ -153,3 +153,20 @@ def get_admin_user(user=Depends(get_current_user)):
             detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
         )
     return user
+
+def get_auth_token(
+    request: Request,
+    auth_token: HTTPAuthorizationCredentials = Depends(bearer_security),
+) -> Optional[str]:
+    token = None
+
+    if auth_token is not None:
+        token = auth_token.credentials
+
+    if token is None and "token" in request.cookies:
+        token = request.cookies.get("token")
+
+    if token is None:
+        raise HTTPException(status_code=403, detail="Not authenticated")
+
+    return token

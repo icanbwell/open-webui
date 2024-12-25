@@ -184,12 +184,23 @@ https://github.com/open-webui/open-webui
 """
 )
 
+def print_middleware_chain(app1: FastAPI) -> None:
+    """
+    Print out the middleware chain for a FastAPI application.
+
+    Args:
+    app (FastAPI): The FastAPI application instance
+    """
+    log.info("Middleware Chain:")
+    for idx, middleware in enumerate(app1.user_middleware, 1):
+        log.info(f"[{idx}] Middleware: {middleware!r}")
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app1: FastAPI):
     if RESET_CONFIG_ON_START:
         reset_config()
 
+    print_middleware_chain(app1)
     asyncio.create_task(periodic_usage_pool_cleanup())
     yield
 
@@ -608,7 +619,7 @@ class ChatCompletionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if not is_chat_completion_request(request):
             return await call_next(request)
-        log.debug(f"request.url.path: {request.url.path}")
+        log.debug(f"ChatCompletionMiddleware:dispatch request.url.path: {request.url.path} {request!r} call_next: {call_next!r}")
 
         model_list = await get_all_models()
         models = {model["id"]: model for model in model_list}
@@ -637,10 +648,12 @@ class ChatCompletionMiddleware(BaseHTTPMiddleware):
                     )
             else:
                 if not model_info:
-                    return JSONResponse(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        content={"detail": "Model not found"},
-                    )
+                    log.info(f"ChatCompletionMiddleware:dispatch Model not found: {model['id']}")
+                    pass
+                    # return JSONResponse(
+                    #     status_code=status.HTTP_404_NOT_FOUND,
+                    #     content={"detail": "Model not found"},
+                    # )
                 elif not (
                     user.id == model_info.user_id
                     or has_access(
@@ -779,6 +792,7 @@ class ChatCompletionMiddleware(BaseHTTPMiddleware):
         ]
 
         response = await call_next(request)
+        log.info(f"ChatCompletionMiddleware:dispatch response: {response!r}")
         if not isinstance(response, StreamingResponse):
             return response
 
@@ -793,9 +807,11 @@ class ChatCompletionMiddleware(BaseHTTPMiddleware):
 
         async def stream_wrapper(original_generator, data_items):
             for item in data_items:
+                log.info(f"ChatCompletionMiddleware:dispatch data_items: {item}")
                 yield wrap_item(json.dumps(item))
 
             async for data in original_generator:
+                log.info(f"ChatCompletionMiddleware:dispatch data: {data}")
                 yield data
 
         return StreamingResponse(
@@ -886,7 +902,7 @@ class PipelineMiddleware(BaseHTTPMiddleware):
         if not is_chat_completion_request(request):
             return await call_next(request)
 
-        log.debug(f"request.url.path: {request.url.path}")
+        log.debug(f"request.url.path: {request.url.path} {request!r} call_next: {call_next!r}")
         log.info(f"PipelineMiddleware.dispatch request.url.path: {request.url.path}")
         log.info(f"PipelineMiddleware.dispatch request vars: {vars(request)}")
         log.info(f"PipelineMiddleware.dispatch request dict: {request.__dict__}")
@@ -928,6 +944,7 @@ class PipelineMiddleware(BaseHTTPMiddleware):
 
         model_list = await get_all_models()
         models = {model["id"]: model for model in model_list}
+        log.info(f"PipelineMiddleware.dispatch {models=}")
 
         try:
             data = filter_pipeline(data, user, models)
@@ -955,7 +972,7 @@ class PipelineMiddleware(BaseHTTPMiddleware):
 
         log.info(f"PipelineMiddleware.dispatch request._body: {request._body}")
         response = await call_next(request)
-        log.info(f"PipelineMiddleware.dispatch response: {response}")
+        log.info(f"PipelineMiddleware.dispatch response: {response!r}")
         return response
 
     async def _receive(self, body: bytes):
@@ -1284,6 +1301,7 @@ async def generate_chat_completions(
     log.info(f"OpenWebUI:main generate_chat_completions: {form_data=}, {user=}, {bypass_filter=}")
     model_list = await get_all_models()
     models = {model["id"]: model for model in model_list}
+    log.info(f"OpenWebUI:main generate_chat_completions: {models=}")
 
     model_id = form_data["model"]
     if model_id not in models:
@@ -1312,12 +1330,14 @@ async def generate_chat_completions(
                 )
         else:
             model_info = Models.get_model_by_id(model_id)
-            log.info(f"OpenWebUI:main generate_chat_completions: {model_info=}")
+            log.info(f"OpenWebUI:main generate_chat_completions: {model_info=} for {model_id=}")
             if not model_info:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Model not found",
-                )
+                # model is not in the db but returned from get_all_models so continue
+                pass
+                # raise HTTPException(
+                #     status_code=404,
+                #     detail="Model not found",
+                # )
             elif not (
                 user.id == model_info.user_id
                 or has_access(
