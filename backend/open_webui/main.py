@@ -303,8 +303,6 @@ from open_webui.tasks import stop_task, list_tasks  # Import from tasks.py
 from open_webui.utils.access_control import has_access
 from starlette.routing import BaseRoute, Route
 
-from open_webui.utils.utils import get_auth_token
-
 if SAFE_MODE:
     print("SAFE MODE ENABLED")
     Functions.deactivate_all_functions()
