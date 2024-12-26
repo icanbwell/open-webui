@@ -368,8 +368,9 @@ async def lifespan(app1: FastAPI):
     if RESET_CONFIG_ON_START:
         reset_config()
 
-    print_middleware_chain(app1)
-    print_routes(app1)
+    if log.isEnabledFor(logging.DEBUG):
+        print_middleware_chain(app1)
+        print_routes(app1)
     asyncio.create_task(periodic_usage_pool_cleanup())
     yield
 
