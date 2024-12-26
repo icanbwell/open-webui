@@ -15,20 +15,24 @@ from fastapi import (
 )
 from starlette.responses import RedirectResponse
 
-from open_webui.apps.webui.models.auths import Auths
-from open_webui.apps.webui.models.users import Users
+from open_webui.models.auths import Auths
+from open_webui.models.users import Users
+from open_webui.models.groups import Groups, GroupModel, GroupUpdateForm
 from open_webui.config import (
     DEFAULT_USER_ROLE,
     ENABLE_OAUTH_SIGNUP,
     OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
     OAUTH_PROVIDERS,
     ENABLE_OAUTH_ROLE_MANAGEMENT,
+    ENABLE_OAUTH_GROUP_MANAGEMENT,
     OAUTH_ROLES_CLAIM,
+    OAUTH_GROUPS_CLAIM,
     OAUTH_EMAIL_CLAIM,
     OAUTH_PICTURE_CLAIM,
     OAUTH_USERNAME_CLAIM,
     OAUTH_ALLOWED_ROLES,
     OAUTH_ADMIN_ROLES,
+    OAUTH_ALLOWED_DOMAINS,
     WEBHOOK_URL,
     JWT_EXPIRES_IN,
     AppConfig,
@@ -40,7 +44,7 @@ from open_webui.env import (
 from open_webui.constants import ERROR_MESSAGES
 from open_webui.env import WEBUI_SESSION_COOKIE_SAME_SITE, WEBUI_SESSION_COOKIE_SECURE
 from open_webui.utils.misc import parse_duration
-from open_webui.utils.utils import get_password_hash, create_token
+from open_webui.utils.auth import get_password_hash, create_token
 from open_webui.utils.webhook import post_webhook
 
 logging.basicConfig(stream=sys.stdout, level=GLOBAL_LOG_LEVEL)
@@ -52,12 +56,15 @@ auth_manager_config.DEFAULT_USER_ROLE = DEFAULT_USER_ROLE
 auth_manager_config.ENABLE_OAUTH_SIGNUP = ENABLE_OAUTH_SIGNUP
 auth_manager_config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL = OAUTH_MERGE_ACCOUNTS_BY_EMAIL
 auth_manager_config.ENABLE_OAUTH_ROLE_MANAGEMENT = ENABLE_OAUTH_ROLE_MANAGEMENT
+auth_manager_config.ENABLE_OAUTH_GROUP_MANAGEMENT = ENABLE_OAUTH_GROUP_MANAGEMENT
 auth_manager_config.OAUTH_ROLES_CLAIM = OAUTH_ROLES_CLAIM
+auth_manager_config.OAUTH_GROUPS_CLAIM = OAUTH_GROUPS_CLAIM
 auth_manager_config.OAUTH_EMAIL_CLAIM = OAUTH_EMAIL_CLAIM
 auth_manager_config.OAUTH_PICTURE_CLAIM = OAUTH_PICTURE_CLAIM
 auth_manager_config.OAUTH_USERNAME_CLAIM = OAUTH_USERNAME_CLAIM
 auth_manager_config.OAUTH_ALLOWED_ROLES = OAUTH_ALLOWED_ROLES
 auth_manager_config.OAUTH_ADMIN_ROLES = OAUTH_ADMIN_ROLES
+auth_manager_config.OAUTH_ALLOWED_DOMAINS = OAUTH_ALLOWED_DOMAINS
 auth_manager_config.WEBHOOK_URL = WEBHOOK_URL
 auth_manager_config.JWT_EXPIRES_IN = JWT_EXPIRES_IN
 
@@ -78,13 +85,13 @@ class OAuthManager:
             )
 
     def get_client(self, provider_name):
-        log.info(f"OAuthManager:get_client Getting OAuth client for provider '{provider_name}'")
+        log.debug(f"OAuthManager:get_client Getting OAuth client for provider '{provider_name}'")
         client = self.oauth.create_client(provider_name)
-        log.info(f"OAuthManager:get_client Finished Getting Auth client for provider '{provider_name}'")
+        log.debug(f"OAuthManager:get_client Finished Getting Auth client for provider '{provider_name}'")
         return client
 
     def get_user_role(self, user, user_data):
-        log.info(f"OAuthManager:get_user_role Getting user role for user '{user}' and user data '{user_data}'")
+        log.debug(f"OAuthManager:get_user_role Getting user role for user '{user}' and user data '{user_data}'")
         if user and Users.get_num_users() == 1:
             # If the user is the only user, assign the role "admin" - actually repairs role for single user on login
             return "admin"
@@ -130,8 +137,63 @@ class OAuthManager:
 
         return role
 
+    def update_user_groups(self, user, user_data, default_permissions):
+        oauth_claim = auth_manager_config.OAUTH_GROUPS_CLAIM
+
+        user_oauth_groups: list[str] = user_data.get(oauth_claim, list())
+        user_current_groups: list[GroupModel] = Groups.get_groups_by_member_id(user.id)
+        all_available_groups: list[GroupModel] = Groups.get_groups()
+
+        # Remove groups that user is no longer a part of
+        for group_model in user_current_groups:
+            if group_model.name not in user_oauth_groups:
+                # Remove group from user
+
+                user_ids = group_model.user_ids
+                user_ids = [i for i in user_ids if i != user.id]
+
+                # In case a group is created, but perms are never assigned to the group by hitting "save"
+                group_permissions = group_model.permissions
+                if not group_permissions:
+                    group_permissions = default_permissions
+
+                update_form = GroupUpdateForm(
+                    name=group_model.name,
+                    description=group_model.description,
+                    permissions=group_permissions,
+                    user_ids=user_ids,
+                )
+                Groups.update_group_by_id(
+                    id=group_model.id, form_data=update_form, overwrite=False
+                )
+
+        # Add user to new groups
+        for group_model in all_available_groups:
+            if group_model.name in user_oauth_groups and not any(
+                gm.name == group_model.name for gm in user_current_groups
+            ):
+                # Add user to group
+
+                user_ids = group_model.user_ids
+                user_ids.append(user.id)
+
+                # In case a group is created, but perms are never assigned to the group by hitting "save"
+                group_permissions = group_model.permissions
+                if not group_permissions:
+                    group_permissions = default_permissions
+
+                update_form = GroupUpdateForm(
+                    name=group_model.name,
+                    description=group_model.description,
+                    permissions=group_permissions,
+                    user_ids=user_ids,
+                )
+                Groups.update_group_by_id(
+                    id=group_model.id, form_data=update_form, overwrite=False
+                )
+
     async def handle_login(self, provider, request):
-        log.info(f"OAuthManager:handle_login Handling OAuth login for provider '{provider}' {request.__dict__}")
+        log.debug(f"OAuthManager:handle_login Handling OAuth login for provider '{provider}' {request.__dict__}")
         if provider not in OAUTH_PROVIDERS:
             log.error(f"OAuth provider '{provider}' not found")
             raise HTTPException(404)
@@ -139,7 +201,7 @@ class OAuthManager:
         redirect_uri = OAUTH_PROVIDERS[provider].get("redirect_uri") or request.url_for(
             "oauth_callback", provider=provider
         )
-        log.info(f"OAuthManager:handle_login Redirecting to OAuth provider '{provider}' with redirect URI '{redirect_uri}'")
+        log.debug(f"OAuthManager:handle_login Redirecting to OAuth provider '{provider}' with redirect URI '{redirect_uri}'")
         client = self.get_client(provider)
         if client is None:
             raise HTTPException(404)
@@ -147,14 +209,14 @@ class OAuthManager:
         return await client.authorize_redirect(request, redirect_uri)
 
     async def handle_callback(self, provider, request, response):
-        log.info(f"OAuthManager:handle_callback Handling OAuth callback for provider '{provider}' {request.__dict__} {response.__dict__}")
+        log.debug(f"OAuthManager:handle_callback Handling OAuth callback for provider '{provider}' {request.__dict__} {response.__dict__}")
         if provider not in OAUTH_PROVIDERS:
             raise HTTPException(404)
         client = self.get_client(provider)
         try:
-            log.info(f"OAuthManager:handle_callback Authorizing OAuth callback for provider '{provider}'")
+            log.debug(f"OAuthManager:handle_callback Authorizing OAuth callback for provider '{provider}'")
             token: Dict[str, Any] = await client.authorize_access_token(request)
-            log.info(f"OAuthManager:handle_callback OAuth Authorization token: {token}")
+            log.debug(f"OAuthManager:handle_callback OAuth Authorization token: {token}")
         except Exception as e:
             log.warning(f"OAuthManager:handle_callback OAuth callback error: {e}")
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
@@ -175,6 +237,14 @@ class OAuthManager:
         # We currently mandate that email addresses are provided
         if not email:
             log.warning(f"OAuthManager:handle_callback OAuth callback failed, email is missing: {user_data}")
+            raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+        if (
+            "*" not in auth_manager_config.OAUTH_ALLOWED_DOMAINS
+            and email.split("@")[-1] not in auth_manager_config.OAUTH_ALLOWED_DOMAINS
+        ):
+            log.warning(
+                f"OAuth callback failed, e-mail domain is not in the list of allowed domains: {user_data}"
+            )
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
         log.info(f"OAuthManager:handle_callback OAuth callback for provider '{provider}' with email '{email}'")
@@ -232,7 +302,7 @@ class OAuthManager:
 
                 role = self.get_user_role(None, user_data)
 
-                log.info(f"OAuthManager:handle_callback Creating new user with email '{email}'")
+                log.debug(f"OAuthManager:handle_callback Creating new user with email '{email}'")
                 user = Auths.insert_new_auth(
                     email=email,
                     password=get_password_hash(
@@ -266,6 +336,13 @@ class OAuthManager:
             expires_delta=parse_duration(auth_manager_config.JWT_EXPIRES_IN),
         )
 
+        if auth_manager_config.ENABLE_OAUTH_GROUP_MANAGEMENT:
+            self.update_user_groups(
+                user=user,
+                user_data=user_data,
+                default_permissions=request.app.state.config.USER_PERMISSIONS,
+            )
+
         # Set the cookie token
         response.set_cookie(
             key="token",
@@ -275,22 +352,20 @@ class OAuthManager:
             secure=WEBUI_SESSION_COOKIE_SECURE,
         )
 
-
-        # Redirect back to the frontend with the JWT token
-        log.info(f"OAuthManager:handle_callback Redirecting for token '{jwt_token}' sso_token: '{token}'")
-        redirect_url = f"{request.base_url}auth#token={jwt_token}"
-        redirect_response = RedirectResponse(url=redirect_url)
-        if token:
-            # Also set the original token in the cookie
-            redirect_response.set_cookie(
-                key="sso_token",
-                value=token["access_token"],
-                httponly=True,  # Ensures the cookie is not accessible via JavaScript
+        if ENABLE_OAUTH_SIGNUP.value:
+            oauth_id_token = token.get("id_token")
+            response.set_cookie(
+                key="oauth_id_token",
+                value=oauth_id_token,
+                httponly=True,
                 samesite=WEBUI_SESSION_COOKIE_SAME_SITE,
                 secure=WEBUI_SESSION_COOKIE_SECURE,
             )
 
-        return redirect_response
+        # Redirect back to the frontend with the JWT token
+        log.debug(f"OAuthManager:handle_callback Redirecting for token '{jwt_token}' sso_token: '{token}'")
+        redirect_url = f"{request.base_url}auth#token={jwt_token}"
+        return RedirectResponse(url=redirect_url, headers=response.headers)
 
 
 oauth_manager = OAuthManager()
