@@ -533,7 +533,7 @@ async def generate_chat_completion(
     user=Depends(get_verified_user),
     bypass_filter: Optional[bool] = False,
 ):
-    log.debug(f"OpenAI:main generate_chat_completion: {form_data=} {user=} {auth_token=} {bypass_filter=}")
+    log.debug(f"OpenAI:main generate_chat_completion: {form_data=} {user=} {bypass_filter=}")
 
     if BYPASS_MODEL_ACCESS_CONTROL:
         bypass_filter = True
