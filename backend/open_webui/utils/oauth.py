@@ -247,7 +247,7 @@ class OAuthManager:
             )
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
-        log.info(f"OAuthManager:handle_callback OAuth callback for provider '{provider}' with email '{email}'")
+        log.debug(f"OAuthManager:handle_callback OAuth callback for provider '{provider}' with email '{email}'")
         # Check if the user exists
         user = Users.get_user_by_oauth_sub(provider_sub)
 

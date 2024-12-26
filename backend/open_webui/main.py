@@ -348,12 +348,12 @@ def print_middleware_chain(app1: FastAPI) -> None:
     Args:
     app (FastAPI): The FastAPI application instance
     """
-    log.info("Middleware Chain:")
+    log.debug("Middleware Chain:")
     for idx, middleware in enumerate(app1.user_middleware, 1):
-        log.info(f"[{idx}] Middleware: {middleware!r}")
+        log.debug(f"[{idx}] Middleware: {middleware!r}")
 
 def print_routes(app1: FastAPI):
-    log.info("Routes:")
+    log.debug("Routes:")
     route: BaseRoute
     for idx, route in enumerate(app1.routes):
         if isinstance(route, Route):
@@ -363,7 +363,7 @@ def print_routes(app1: FastAPI):
                 "methods": route.methods,
                 "endpoint": route.endpoint.__name__
             }
-            log.info(f"[{idx}] Route: {route_info}")
+            log.debug(f"[{idx}] Route: {route_info}")
 
 @asynccontextmanager
 async def lifespan(app1: FastAPI):
