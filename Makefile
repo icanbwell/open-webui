@@ -38,6 +38,6 @@ build:
 run-pre-commit:
 	docker run -it --rm \
 		-v $(PWD):/app \
-		-w /app \
+		-w /app/backend \
 		python:3.11-slim \
 		bash -c "pip install black && black . --exclude \".venv/|/venv/\""
