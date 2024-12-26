@@ -33,3 +33,11 @@ update:
 
 build:
 	@docker build . -t openwebui-local:latest
+
+.PHONY: run-pre-commit
+run-pre-commit:
+	docker run -it --rm \
+		-v $(PWD):/app \
+		-w /app \
+		python:3.11-slim \
+		bash -c "pip install black && black . --exclude \".venv/|/venv/\""

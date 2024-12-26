@@ -25,7 +25,7 @@ from open_webui.env import (
     AIOHTTP_CLIENT_TIMEOUT_OPENAI_MODEL_LIST,
     ENABLE_FORWARD_USER_INFO_HEADERS,
     BYPASS_MODEL_ACCESS_CONTROL,
-    ENABLE_FORWARD_OAUTH_TOKEN
+    ENABLE_FORWARD_OAUTH_TOKEN,
 )
 
 from open_webui.constants import ERROR_MESSAGES
@@ -494,8 +494,9 @@ class ConnectionVerificationForm(BaseModel):
 
 @router.post("/verify")
 async def verify_connection(
-        request: Request,
-    form_data: ConnectionVerificationForm, user=Depends(get_admin_user)
+    request: Request,
+    form_data: ConnectionVerificationForm,
+    user=Depends(get_admin_user),
 ):
     url = form_data.url
     key = form_data.key
@@ -547,7 +548,9 @@ async def generate_chat_completion(
     user=Depends(get_verified_user),
     bypass_filter: Optional[bool] = False,
 ):
-    log.debug(f"OpenAI:main generate_chat_completion: {form_data=} {user=} {bypass_filter=}")
+    log.debug(
+        f"OpenAI:main generate_chat_completion: {form_data=} {user=} {bypass_filter=}"
+    )
 
     if BYPASS_MODEL_ACCESS_CONTROL:
         bypass_filter = True
@@ -579,14 +582,18 @@ async def generate_chat_completion(
                     user.id, type="read", access_control=model_info.access_control
                 )
             ):
-                log.debug(f"OpenAI:main generate_chat_completion: {user.id=} {model_info.user_id=}")
+                log.debug(
+                    f"OpenAI:main generate_chat_completion: {user.id=} {model_info.user_id=}"
+                )
                 raise HTTPException(
                     status_code=403,
                     detail="Model not found",
                 )
     elif not bypass_filter:
         if user.role != "admin":
-            log.debug(f"OpenAI:main generate_chat_completion: Model not found because user is not admin {user.role=}")
+            log.debug(
+                f"OpenAI:main generate_chat_completion: Model not found because user is not admin {user.role=}"
+            )
             raise HTTPException(
                 status_code=403,
                 detail="Model not found",

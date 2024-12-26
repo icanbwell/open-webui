@@ -85,13 +85,19 @@ class OAuthManager:
             )
 
     def get_client(self, provider_name):
-        log.debug(f"OAuthManager:get_client Getting OAuth client for provider '{provider_name}'")
+        log.debug(
+            f"OAuthManager:get_client Getting OAuth client for provider '{provider_name}'"
+        )
         client = self.oauth.create_client(provider_name)
-        log.debug(f"OAuthManager:get_client Finished Getting Auth client for provider '{provider_name}'")
+        log.debug(
+            f"OAuthManager:get_client Finished Getting Auth client for provider '{provider_name}'"
+        )
         return client
 
     def get_user_role(self, user, user_data):
-        log.debug(f"OAuthManager:get_user_role Getting user role for user '{user}' and user data '{user_data}'")
+        log.debug(
+            f"OAuthManager:get_user_role Getting user role for user '{user}' and user data '{user_data}'"
+        )
         if user and Users.get_num_users() == 1:
             # If the user is the only user, assign the role "admin" - actually repairs role for single user on login
             return "admin"
@@ -193,7 +199,9 @@ class OAuthManager:
                 )
 
     async def handle_login(self, provider, request):
-        log.debug(f"OAuthManager:handle_login Handling OAuth login for provider '{provider}' {request.__dict__}")
+        log.debug(
+            f"OAuthManager:handle_login Handling OAuth login for provider '{provider}' {request.__dict__}"
+        )
         if provider not in OAUTH_PROVIDERS:
             log.error(f"OAuth provider '{provider}' not found")
             raise HTTPException(404)
@@ -201,7 +209,9 @@ class OAuthManager:
         redirect_uri = OAUTH_PROVIDERS[provider].get("redirect_uri") or request.url_for(
             "oauth_callback", provider=provider
         )
-        log.debug(f"OAuthManager:handle_login Redirecting to OAuth provider '{provider}' with redirect URI '{redirect_uri}'")
+        log.debug(
+            f"OAuthManager:handle_login Redirecting to OAuth provider '{provider}' with redirect URI '{redirect_uri}'"
+        )
         client = self.get_client(provider)
         if client is None:
             raise HTTPException(404)
@@ -209,14 +219,20 @@ class OAuthManager:
         return await client.authorize_redirect(request, redirect_uri)
 
     async def handle_callback(self, provider, request, response):
-        log.debug(f"OAuthManager:handle_callback Handling OAuth callback for provider '{provider}' {request.__dict__} {response.__dict__}")
+        log.debug(
+            f"OAuthManager:handle_callback Handling OAuth callback for provider '{provider}' {request.__dict__} {response.__dict__}"
+        )
         if provider not in OAUTH_PROVIDERS:
             raise HTTPException(404)
         client = self.get_client(provider)
         try:
-            log.debug(f"OAuthManager:handle_callback Authorizing OAuth callback for provider '{provider}'")
+            log.debug(
+                f"OAuthManager:handle_callback Authorizing OAuth callback for provider '{provider}'"
+            )
             token: Dict[str, Any] = await client.authorize_access_token(request)
-            log.debug(f"OAuthManager:handle_callback OAuth Authorization token: {token}")
+            log.debug(
+                f"OAuthManager:handle_callback OAuth Authorization token: {token}"
+            )
         except Exception as e:
             log.warning(f"OAuthManager:handle_callback OAuth callback error: {e}")
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
@@ -224,19 +240,25 @@ class OAuthManager:
         if not user_data:
             user_data: UserInfo = await client.userinfo(token=token)
         if not user_data:
-            log.warning(f"OAuthManager:handle_callback OAuth callback failed, user data is missing: {token}")
+            log.warning(
+                f"OAuthManager:handle_callback OAuth callback failed, user data is missing: {token}"
+            )
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
         sub = user_data.get("sub")
         if not sub:
-            log.warning(f"OAuthManager:handle_callback OAuth callback failed, sub is missing: {user_data}")
+            log.warning(
+                f"OAuthManager:handle_callback OAuth callback failed, sub is missing: {user_data}"
+            )
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
         provider_sub = f"{provider}@{sub}"
         email_claim = auth_manager_config.OAUTH_EMAIL_CLAIM
         email = user_data.get(email_claim, "").lower()
         # We currently mandate that email addresses are provided
         if not email:
-            log.warning(f"OAuthManager:handle_callback OAuth callback failed, email is missing: {user_data}")
+            log.warning(
+                f"OAuthManager:handle_callback OAuth callback failed, email is missing: {user_data}"
+            )
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
         if (
             "*" not in auth_manager_config.OAUTH_ALLOWED_DOMAINS
@@ -247,7 +269,9 @@ class OAuthManager:
             )
             raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
-        log.debug(f"OAuthManager:handle_callback OAuth callback for provider '{provider}' with email '{email}'")
+        log.debug(
+            f"OAuthManager:handle_callback OAuth callback for provider '{provider}' with email '{email}'"
+        )
         # Check if the user exists
         user = Users.get_user_by_oauth_sub(provider_sub)
 
@@ -302,7 +326,9 @@ class OAuthManager:
 
                 role = self.get_user_role(None, user_data)
 
-                log.debug(f"OAuthManager:handle_callback Creating new user with email '{email}'")
+                log.debug(
+                    f"OAuthManager:handle_callback Creating new user with email '{email}'"
+                )
                 user = Auths.insert_new_auth(
                     email=email,
                     password=get_password_hash(
@@ -363,7 +389,9 @@ class OAuthManager:
             )
 
         # Redirect back to the frontend with the JWT token
-        log.debug(f"OAuthManager:handle_callback Redirecting for token '{jwt_token}' sso_token: '{token}'")
+        log.debug(
+            f"OAuthManager:handle_callback Redirecting for token '{jwt_token}' sso_token: '{token}'"
+        )
         redirect_url = f"{request.base_url}auth#token={jwt_token}"
         return RedirectResponse(url=redirect_url, headers=response.headers)
 

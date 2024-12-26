@@ -339,6 +339,7 @@ https://github.com/open-webui/open-webui
 """
 )
 
+
 def print_middleware_chain(app1: FastAPI) -> None:
     """
     Print out the middleware chain for a FastAPI application.
@@ -350,6 +351,7 @@ def print_middleware_chain(app1: FastAPI) -> None:
     for idx, middleware in enumerate(app1.user_middleware, 1):
         log.debug(f"[{idx}] Middleware: {middleware!r}")
 
+
 def print_routes(app1: FastAPI):
     log.debug("Routes:")
     route: BaseRoute
@@ -359,9 +361,10 @@ def print_routes(app1: FastAPI):
                 "path": route.path,
                 "name": route.name,
                 "methods": route.methods,
-                "endpoint": route.endpoint.__name__
+                "endpoint": route.endpoint.__name__,
             }
             log.debug(f"[{idx}] Route: {route_info}")
+
 
 @asynccontextmanager
 async def lifespan(app1: FastAPI):

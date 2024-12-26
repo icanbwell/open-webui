@@ -85,7 +85,7 @@ log_sources = [
     "RAG",
     "WEBHOOK",
     "SOCKET",
-    "OAUTH"
+    "OAUTH",
 ]
 
 SRC_LOG_LEVELS = {}

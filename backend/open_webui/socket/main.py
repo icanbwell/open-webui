@@ -196,7 +196,9 @@ async def user_join(sid, data):
     for channel in channels:
         await sio.enter_room(sid, f"channel:{channel.id}")
 
-    log.debug(f"socket user-join {user.name}({user.id}) connected with session ID {sid}")
+    log.debug(
+        f"socket user-join {user.name}({user.id}) connected with session ID {sid}"
+    )
 
     await sio.emit("user-count", {"count": len(USER_POOL.items())})
     return {"id": user.id, "name": user.name}
