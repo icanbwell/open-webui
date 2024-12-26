@@ -25,6 +25,7 @@ from open_webui.env import (
     AIOHTTP_CLIENT_TIMEOUT_OPENAI_MODEL_LIST,
     ENABLE_FORWARD_USER_INFO_HEADERS,
     BYPASS_MODEL_ACCESS_CONTROL,
+    ENABLE_FORWARD_OAUTH_TOKEN
 )
 
 from open_webui.constants import ERROR_MESSAGES
@@ -416,10 +417,16 @@ async def get_models(
             )
         ) as session:
             try:
+                authorization_header: str = f"Bearer {key}"
+                if ENABLE_FORWARD_OAUTH_TOKEN:
+                    auth_token: Optional[str] = request.cookies.get("oauth_id_token")
+                    if auth_token:
+                        authorization_header = f"Bearer {auth_token}"
+
                 async with session.get(
                     f"{url}/models",
                     headers={
-                        "Authorization": f"Bearer {key}",
+                        "Authorization": authorization_header,
                         "Content-Type": "application/json",
                         **(
                             {
@@ -487,6 +494,7 @@ class ConnectionVerificationForm(BaseModel):
 
 @router.post("/verify")
 async def verify_connection(
+        request: Request,
     form_data: ConnectionVerificationForm, user=Depends(get_admin_user)
 ):
     url = form_data.url
@@ -496,10 +504,16 @@ async def verify_connection(
         timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT_OPENAI_MODEL_LIST)
     ) as session:
         try:
+            authorization_header: str = f"Bearer {key}"
+            if ENABLE_FORWARD_OAUTH_TOKEN:
+                auth_token: Optional[str] = request.cookies.get("oauth_id_token")
+                if auth_token:
+                    authorization_header = f"Bearer {auth_token}"
+
             async with session.get(
                 f"{url}/models",
                 headers={
-                    "Authorization": f"Bearer {key}",
+                    "Authorization": authorization_header,
                     "Content-Type": "application/json",
                 },
             ) as r:
@@ -634,12 +648,18 @@ async def generate_chat_completion(
             trust_env=True, timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
         )
 
+        authorization_header: str = f"Bearer {key}"
+        if ENABLE_FORWARD_OAUTH_TOKEN:
+            auth_token: Optional[str] = request.cookies.get("oauth_id_token")
+            if auth_token:
+                authorization_header = f"Bearer {auth_token}"
+
         r = await session.request(
             method="POST",
             url=f"{url}/chat/completions",
             data=payload,
             headers={
-                "Authorization": f"Bearer {key}",
+                "Authorization": authorization_header,
                 "Content-Type": "application/json",
                 **(
                     {
@@ -661,7 +681,6 @@ async def generate_chat_completion(
                 ),
             },
         )
-
         # Check if response is SSE
         if "text/event-stream" in r.headers.get("Content-Type", ""):
             streaming = True

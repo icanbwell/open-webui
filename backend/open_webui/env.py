@@ -393,3 +393,11 @@ else:
 ####################################
 
 OFFLINE_MODE = os.environ.get("OFFLINE_MODE", "false").lower() == "true"
+
+####################################
+# ENABLE_FORWARD_OAUTH_TOKEN
+####################################
+
+ENABLE_FORWARD_OAUTH_TOKEN = (
+    os.environ.get("ENABLE_FORWARD_OAUTH_TOKEN", "False").lower() == "true"
+)
