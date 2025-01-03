@@ -402,6 +402,7 @@ def get_model_path(model: str, update_model: bool = False):
 
     # Attempt to query the huggingface_hub library to determine the local path and/or to update
     try:
+        log.debug(f"Downloading model {model}")
         model_repo_path = snapshot_download(**snapshot_kwargs)
         log.debug(f"model_repo_path: {model_repo_path}")
         return model_repo_path

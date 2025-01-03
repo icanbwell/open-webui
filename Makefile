@@ -14,7 +14,7 @@ remove:
 
 start:
 	$(DOCKER_COMPOSE) start
-startAndBuild: 
+startAndBuild:
 	$(DOCKER_COMPOSE) up -d --build
 
 stop:
@@ -31,3 +31,13 @@ update:
 	$(DOCKER_COMPOSE) up --build -d
 	$(DOCKER_COMPOSE) start
 
+build:
+	@docker build . -t openwebui-local:latest
+
+.PHONY: run-pre-commit
+run-pre-commit:
+	docker run -it --rm \
+		-v $(PWD):/app \
+		-w /app/backend \
+		python:3.11-slim \
+		bash -c "pip install black && black . --exclude \".venv/|/venv/\""
