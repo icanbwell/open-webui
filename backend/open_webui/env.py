@@ -312,6 +312,11 @@ RESET_CONFIG_ON_START = (
     os.environ.get("RESET_CONFIG_ON_START", "False").lower() == "true"
 )
 
+
+ENABLE_REALTIME_CHAT_SAVE = (
+    os.environ.get("ENABLE_REALTIME_CHAT_SAVE", "True").lower() == "true"
+)
+
 ####################################
 # REDIS
 ####################################
@@ -401,3 +406,6 @@ OFFLINE_MODE = os.environ.get("OFFLINE_MODE", "false").lower() == "true"
 ENABLE_FORWARD_OAUTH_TOKEN = (
     os.environ.get("ENABLE_FORWARD_OAUTH_TOKEN", "False").lower() == "true"
 )
+
+if OFFLINE_MODE:
+    os.environ["HF_HUB_OFFLINE"] = "1"
