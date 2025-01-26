@@ -14,7 +14,7 @@ remove:
 
 start:
 	$(DOCKER_COMPOSE) start
-startAndBuild: 
+startAndBuild:
 	$(DOCKER_COMPOSE) up -d --build
 
 stop:
@@ -31,3 +31,32 @@ update:
 	$(DOCKER_COMPOSE) up --build -d
 	$(DOCKER_COMPOSE) start
 
+build:
+	@docker build . -t openwebui-local:latest
+
+.PHONY: run-pre-commit
+run-pre-commit:
+	docker run -it --rm \
+		-v $(PWD):/app \
+		-w /app/backend \
+		python:3.11-slim \
+		bash -c "pip install black && black . --exclude \".venv/|/venv/\""
+
+# Update uv.lock file using Docker
+update-uv-lock:
+	@echo "Updating uv.lock file using Docker..."
+	docker build \
+		--target base \
+		-t open-webui-lock-builder \
+		.
+	docker run --rm \
+		-v $(PWD)/backend:/app/backend \
+		-v $(PWD)/uv.lock:/app/backend/uv.lock \
+		-w /app/backend \
+		open-webui-lock-builder \
+		bash -c "uv pip install --system -r requirements.txt && uv lock > ./uv.lock"
+	@echo "uv.lock file updated successfully."
+
+# Optional: Clean up the temporary image
+clean-lock-builder:
+	docker rmi open-webui-lock-builder || true

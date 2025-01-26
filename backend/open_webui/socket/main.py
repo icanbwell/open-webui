@@ -144,6 +144,7 @@ async def usage(sid, data):
 
 @sio.event
 async def connect(sid, environ, auth):
+    log.debug(f"socket connect {sid} auth: {auth} environ: {environ}")
     user = None
     if auth and "token" in auth:
         data = decode_token(auth["token"])
@@ -161,16 +162,21 @@ async def connect(sid, environ, auth):
             # print(f"user {user.name}({user.id}) connected with session ID {sid}")
             await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
             await sio.emit("usage", {"models": get_models_in_use()})
+    else:
+        log.debug(f"socket session ID {sid} connected with auth {auth}")
+        # raise ConnectionRefusedError(f"Authentication required.  Auth token not provided or invalid: {auth}")
 
 
 @sio.on("user-join")
 async def user_join(sid, data):
+    log.debug(f"socket user-join {sid=} {data=}")
 
     auth = data["auth"] if "auth" in data else None
     if not auth or "token" not in auth:
         return
 
     data = decode_token(auth["token"])
+    log.debug(f"socket user-join decoded token: {data}")
     if data is None or "id" not in data:
         return
 
@@ -190,7 +196,9 @@ async def user_join(sid, data):
     for channel in channels:
         await sio.enter_room(sid, f"channel:{channel.id}")
 
-    # print(f"user {user.name}({user.id}) connected with session ID {sid}")
+    log.debug(
+        f"socket user-join {user.name}({user.id}) connected with session ID {sid}"
+    )
 
     await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
     return {"id": user.id, "name": user.name}
@@ -253,6 +261,7 @@ async def user_list(sid):
 @sio.event
 async def disconnect(sid):
     if sid in SESSION_POOL:
+        log.debug(f"socket session ID {sid} disconnected from SESSION_POOL")
         user = SESSION_POOL[sid]
         del SESSION_POOL[sid]
 
@@ -264,6 +273,7 @@ async def disconnect(sid):
 
         await sio.emit("user-list", {"user_ids": list(USER_POOL.keys())})
     else:
+        log.debug(f"socket session ID {sid} disconnected")
         pass
         # print(f"Unknown session ID {sid} disconnected")
 

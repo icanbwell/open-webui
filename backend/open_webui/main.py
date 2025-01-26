@@ -302,6 +302,8 @@ from open_webui.utils.oauth import oauth_manager
 from open_webui.utils.security_headers import SecurityHeadersMiddleware
 
 from open_webui.tasks import stop_task, list_tasks  # Import from tasks.py
+from open_webui.utils.access_control import has_access
+from starlette.routing import BaseRoute, Route
 
 if SAFE_MODE:
     print("SAFE MODE ENABLED")
@@ -340,11 +342,40 @@ https://github.com/open-webui/open-webui
 )
 
 
+def print_middleware_chain(app1: FastAPI) -> None:
+    """
+    Print out the middleware chain for a FastAPI application.
+
+    Args:
+    app (FastAPI): The FastAPI application instance
+    """
+    log.debug("Middleware Chain:")
+    for idx, middleware in enumerate(app1.user_middleware, 1):
+        log.debug(f"[{idx}] Middleware: {middleware!r}")
+
+
+def print_routes(app1: FastAPI):
+    log.debug("Routes:")
+    route: BaseRoute
+    for idx, route in enumerate(app1.routes):
+        if isinstance(route, Route):
+            route_info = {
+                "path": route.path,
+                "name": route.name,
+                "methods": route.methods,
+                "endpoint": route.endpoint.__name__,
+            }
+            log.debug(f"[{idx}] Route: {route_info}")
+
+
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app1: FastAPI):
     if RESET_CONFIG_ON_START:
         reset_config()
 
+    if log.isEnabledFor(logging.DEBUG):
+        print_middleware_chain(app1)
+        print_routes(app1)
     asyncio.create_task(periodic_usage_pool_cleanup())
     yield
 
@@ -713,6 +744,8 @@ async def inspect_websocket(request: Request, call_next):
     ):
         upgrade = (request.headers.get("Upgrade") or "").lower()
         connection = (request.headers.get("Connection") or "").lower().split(",")
+
+        log.debug(f"inspect_websocket: {upgrade=}, {connection=}")
         # Check that there's the correct headers for an upgrade, else reject the connection
         # This is to work around this upstream issue: https://github.com/miguelgrinberg/python-engineio/issues/367
         if upgrade != "websocket" or "upgrade" not in connection:
@@ -1098,6 +1131,7 @@ if len(OAUTH_PROVIDERS) > 0:
 
 @app.get("/oauth/{provider}/login")
 async def oauth_login(provider: str, request: Request):
+    log.debug(f"OAuth login request for provider: {provider}")
     return await oauth_manager.handle_login(provider, request)
 
 
@@ -1109,6 +1143,7 @@ async def oauth_login(provider: str, request: Request):
 #    - Email addresses are considered unique, so we fail registration if the email address is already taken
 @app.get("/oauth/{provider}/callback")
 async def oauth_callback(provider: str, request: Request, response: Response):
+    log.debug(f"OAuth callback request for provider: {provider}")
     return await oauth_manager.handle_callback(provider, request, response)
 
 
